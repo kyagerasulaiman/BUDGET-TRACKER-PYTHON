@@ -1,112 +1,138 @@
 import tkinter as tk
-from tkinter import messagebox
 from tkinter import ttk
+from tkinter import messagebox
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class BudgetTrackerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Budget Tracker")
-        self.categories = {}
+        self.root.title("Personal Budget Tracker")
+        self.categories = {"Income": 0, "Expenses": 0, "Savings": 0, "Debts": 0}
+        self.transactions = {"Income": [], "Expenses": [], "Savings": [], "Debts": []}
 
-        # UI Components
-        self.create_widgets()
+        self.setup_ui()
 
-    def create_widgets(self):
-        # Title
-        tk.Label(self.root, text="Budget Tracker", font=("Arial", 24)).pack(pady=10)
+    def setup_ui(self):
+        # Header
+        header = tk.Frame(self.root, bg="lightcoral", pady=10)
+        header.pack(fill="x")
+        tk.Label(header, text="Personal Budget Tracker", font=("Arial", 24), bg="lightcoral", fg="white").pack()
 
-        # Tabs
-        self.tab_control = ttk.Notebook(self.root)
-        self.tab_add = ttk.Frame(self.tab_control)
-        self.tab_view = ttk.Frame(self.tab_control)
-        self.tab_graph = ttk.Frame(self.tab_control)
+        # Main Content
+        content = tk.Frame(self.root)
+        content.pack(fill="both", expand=True, padx=20, pady=10)
 
-        self.tab_control.add(self.tab_add, text="Add Transactions")
-        self.tab_control.add(self.tab_view, text="View Totals")
-        self.tab_control.add(self.tab_graph, text="View Graph")
+        # Left Panel - Data Entry
+        self.setup_left_panel(content)
 
-        self.tab_control.pack(expand=1, fill="both")
+        # Right Panel - Overview and Graphs
+        self.setup_right_panel(content)
 
-        # Add Transaction Tab
-        tk.Label(self.tab_add, text="Category:").grid(row=0, column=0, padx=10, pady=10)
-        self.category_entry = tk.Entry(self.tab_add)
-        self.category_entry.grid(row=0, column=1, padx=10, pady=10)
+    def setup_left_panel(self, parent):
+        left_panel = tk.Frame(parent, width=300, relief=tk.GROOVE, borderwidth=2)
+        left_panel.pack(side="left", fill="y", padx=10)
 
-        tk.Label(self.tab_add, text="Amount:").grid(row=1, column=0, padx=10, pady=10)
-        self.amount_entry = tk.Entry(self.tab_add)
-        self.amount_entry.grid(row=1, column=1, padx=10, pady=10)
+        tk.Label(left_panel, text="Add Transaction", font=("Arial", 18)).pack(pady=10)
 
-        tk.Label(self.tab_add, text="Type:").grid(row=2, column=0, padx=10, pady=10)
-        self.transaction_type = ttk.Combobox(self.tab_add, values=["Income", "Expense"])
-        self.transaction_type.grid(row=2, column=1, padx=10, pady=10)
+        tk.Label(left_panel, text="Category:").pack(anchor="w", padx=10)
+        self.category_combobox = ttk.Combobox(left_panel, values=["Income", "Expenses", "Savings", "Debts"], state="readonly")
+        self.category_combobox.pack(fill="x", padx=10, pady=5)
 
-        tk.Button(self.tab_add, text="Add Transaction", command=self.add_transaction).grid(row=3, column=0, columnspan=2, pady=20)
+        tk.Label(left_panel, text="Description:").pack(anchor="w", padx=10)
+        self.description_entry = tk.Entry(left_panel)
+        self.description_entry.pack(fill="x", padx=10, pady=5)
 
-        # View Totals Tab
-        self.totals_text = tk.Text(self.tab_view, width=50, height=15, state="disabled")
-        self.totals_text.pack(pady=20)
+        tk.Label(left_panel, text="Amount:").pack(anchor="w", padx=10)
+        self.amount_entry = tk.Entry(left_panel)
+        self.amount_entry.pack(fill="x", padx=10, pady=5)
 
-        tk.Button(self.tab_view, text="Refresh Totals", command=self.show_totals).pack(pady=10)
+        tk.Button(left_panel, text="Add", command=self.add_transaction).pack(pady=10)
 
-        # Graph Tab
-        tk.Button(self.tab_graph, text="Show Graph", command=self.show_graph).pack(pady=20)
+    def setup_right_panel(self, parent):
+        right_panel = tk.Frame(parent)
+        right_panel.pack(side="right", fill="both", expand=True)
+
+        # Overview Section
+        overview_frame = tk.Frame(right_panel)
+        overview_frame.pack(fill="x", pady=10)
+
+        tk.Label(overview_frame, text="Overview", font=("Arial", 18)).pack(anchor="w")
+
+        self.overview_text = tk.Text(overview_frame, height=8, state="disabled", wrap="word", bg="lightyellow")
+        self.overview_text.pack(fill="x", pady=5)
+
+        # Graph Section
+        graph_frame = tk.Frame(right_panel)
+        graph_frame.pack(fill="both", expand=True)
+
+        tk.Label(graph_frame, text="Visual Representation", font=("Arial", 18)).pack(anchor="w", pady=5)
+
+        self.fig, self.ax = plt.subplots(figsize=(6, 4))
+        self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
+        self.canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.update_graph()
 
     def add_transaction(self):
-        category = self.category_entry.get().strip()
+        category = self.category_combobox.get()
+        description = self.description_entry.get().strip()
         amount = self.amount_entry.get().strip()
-        transaction_type = self.transaction_type.get()
 
-        if not category or not amount or not transaction_type:
-            messagebox.showerror("Input Error", "Please fill all fields.")
+        if not category or not description or not amount:
+            messagebox.showerror("Error", "All fields must be filled.")
             return
 
         try:
             amount = float(amount)
         except ValueError:
-            messagebox.showerror("Input Error", "Amount must be a number.")
+            messagebox.showerror("Error", "Amount must be a valid number.")
             return
 
-        if category not in self.categories:
-            self.categories[category] = 0
+        self.categories[category] += amount
+        self.transactions[category].append((description, amount))
 
-        if transaction_type == "Income":
-            self.categories[category] += amount
-        elif transaction_type == "Expense":
-            self.categories[category] -= amount
+        messagebox.showinfo("Success", f"Added {amount} to {category}.")
+        self.update_overview()
+        self.update_graph()
 
-        messagebox.showinfo("Success", f"{transaction_type} of {amount} added to {category}.")
-        self.clear_entries()
-
-    def clear_entries(self):
-        self.category_entry.delete(0, tk.END)
+        # Clear inputs
+        self.category_combobox.set("")
+        self.description_entry.delete(0, tk.END)
         self.amount_entry.delete(0, tk.END)
-        self.transaction_type.set("")
 
-    def show_totals(self):
-        self.totals_text.config(state="normal")
-        self.totals_text.delete(1.0, tk.END)
+    def update_overview(self):
+        self.overview_text.config(state="normal")
+        self.overview_text.delete(1.0, tk.END)
 
-        for category, total in self.categories.items():
-            self.totals_text.insert(tk.END, f"{category}: {total:.2f}\n")
+        total = sum(self.categories.values())
+        for category, amount in self.categories.items():
+            self.overview_text.insert(tk.END, f"{category}: {amount:.2f}\n")
 
-        self.totals_text.config(state="disabled")
+        self.overview_text.insert(tk.END, f"\nTotal: {total:.2f}")
+        self.overview_text.config(state="disabled")
 
-    def show_graph(self):
-        if not self.categories:
-            messagebox.showinfo("No Data", "No transactions to display.")
-            return
+    def update_graph(self):
+        self.ax.clear()
 
-        labels = self.categories.keys()
-        values = self.categories.values()
+        categories = list(self.categories.keys())
+        amounts = list(self.categories.values())
 
-        plt.bar(labels, values, color=['green' if value >= 0 else 'red' for value in values])
-        plt.xlabel('Categories')
-        plt.ylabel('Amount')
-        plt.title('Budget Tracker')
-        plt.xticks(rotation=45, ha='right')
-        plt.tight_layout()
-        plt.show()
+        # Handle case where all amounts are zero
+        if all(amount == 0 for amount in amounts):
+            self.ax.text(0.5, 0.5, "No data to display", ha="center", va="center", fontsize=14)
+            self.ax.set_title("Category Distribution")
+        else:
+            self.ax.pie(
+                amounts,
+                labels=categories,
+                autopct="%1.1f%%",
+                startangle=90,
+                colors=["green", "red", "blue", "orange"]
+            )
+            self.ax.set_title("Category Distribution")
+
+        self.canvas.draw()
+
 
 if __name__ == "__main__":
     root = tk.Tk()
